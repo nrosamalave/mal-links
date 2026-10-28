@@ -1,7 +1,7 @@
 # Mal's links
 
 The link in Mal's TikTok bio: **links.askmal.live**. One page (`site/index.html`) in the Ask Mal LIVE arcade look:
-Season Ticket (free Discord), RotoBot with code MAL, Ask Mal LIVE, YouTube and X, with shooting stars and a biplane
+Season Ticket (free Discord), RotoBot with code MAL, Ask Mal LIVE, YouTube and X, with fireworks and a biplane
 dogfight in the sky.
 
 - **Always on.** It's a Render static site (free), separate from Ask Mal LIVE, so it never sleeps and editing it never
