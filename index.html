@@ -138,7 +138,8 @@
   .toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; }
 
   /* Halloween (html.spooky): a haunted hill under a full moon instead of the football field, blood-red name */
-  #haunt { display: none; position: fixed; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+  /* Sized to the tallest the screen gets (lvh), so the scene doesn't stretch and redraw when a phone's toolbar slides away */
+  #haunt { display: none; position: fixed; left: 0; top: 0; width: 100%; height: 100%; height: 100lvh; image-rendering: pixelated; pointer-events: none; }
   html.spooky { --night: #080308; --ink: #040104; --ink2: #150910; --ink3: #3a1320; --hi: #f2e8da; --muted: #b9a5b0; --yellow: #ff7a1a; --pink: #d8102c; --cyan: #8cff5a; }
   html.spooky .backdrop, html.spooky #skyfx { display: none; }
   html.spooky #haunt { display: block; }
@@ -600,7 +601,7 @@ track("$pageview", { "$current_url": location.origin + location.pathname, "$refe
   const PUMPKIN_FACE = PUMPKIN.flatMap((row, y) => [...row].flatMap((ch, x) => (ch === "f" ? [[x, y]] : [])));
 
   function build() {
-    W = Math.ceil(innerWidth / P); H = Math.ceil(innerHeight / P);
+    W = Math.ceil(cv.clientWidth / P); H = Math.ceil(cv.clientHeight / P);
     cv.width = W; cv.height = H;
     g.imageSmoothingEnabled = false;
     const r = seeded(1031);
@@ -997,7 +998,10 @@ track("$pageview", { "$current_url": location.origin + location.pathname, "$refe
   }
 
   let resizing;
-  addEventListener("resize", () => { clearTimeout(resizing); resizing = setTimeout(build, 150); });
+  addEventListener("resize", () => {  // only a real change of size redraws the scene (rotating, a desktop window)
+    clearTimeout(resizing);
+    resizing = setTimeout(() => { if (Math.ceil(cv.clientWidth / P) !== W || Math.ceil(cv.clientHeight / P) !== H) build(); }, 150);
+  });
   build();
   document.fonts?.ready.then(build);
   if (still) return;
