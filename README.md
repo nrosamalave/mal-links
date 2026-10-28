@@ -10,6 +10,9 @@ fireworks and a biplane dogfight in the sky.
 - **LIVE banner.** The page asks `https://askmal.live/api/status` every 20 s and shows "Mal is LIVE now" while the line
   is open and the stream overlay is running.
 - **Taps** go to Ask Mal's `/api/t` → PostHog: `$pageview` (page `links`) and `link_tap` with `to` = which link.
+- **Halloween look** (`html.spooky`): a haunted hill under a full moon, blood-red name, bats, lightning, a ghost, a
+  witch, a spider. It's on until 6 AM ET Monday Nov 2, 2026, then the normal look returns by itself (the date is in the
+  small script in `<head>`). Preview either look with `?spooky=1` / `?spooky=0`.
 
 ## Change a link
 
