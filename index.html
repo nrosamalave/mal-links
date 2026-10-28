@@ -149,7 +149,7 @@
   /* The cards and buttons join in: the buttons melt and the RotoBot card leaks slime (#drips, drawn by the script),
      a cobweb on the RotoBot card, the social icons are little tombstones, the rows are cracked stone, and the ticket is
      old and bloodied. */
-  #drips { display: none; position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
+  #drips { display: none; position: absolute; left: 0; top: 0; pointer-events: none; z-index: 2; }
   html.spooky #drips { display: block; }
   html.spooky {
     --web: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64' fill='none' stroke='%23d6cde3' stroke-width='0.8'%3E%3Cpath d='M64 0L0 0M64 0L6 26M64 0L20 46M64 0L40 60M64 0L64 64'/%3E%3Cpath d='M44.8 0Q46 4.5 46.6 7.8Q48.5 11.5 50.8 13.8Q53.5 16.5 56.8 18Q60.5 18.5 64 19.2M28.8 0Q30.5 7.5 31.7 14.3Q35.5 20 39.6 25.3Q45 29 50.8 33Q57.5 34 64 35.2M12.8 0Q15 11 17.2 20.8Q22.5 29 28.8 36.8Q36.5 42.5 44.8 48Q54.5 50 64 51.2'/%3E%3C/svg%3E");
@@ -259,8 +259,8 @@
     <span><b>X</b><small>Rankings, starts and plays all day</small></span>
     <em>▶</em>
   </a>
+  <canvas id="drips" aria-hidden="true"></canvas>
 </main>
-<canvas id="drips" aria-hidden="true"></canvas>
 <div class="toast" id="toast" role="status"></div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="yt" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></symbol>
@@ -1023,15 +1023,20 @@ track("$pageview", { "$current_url": location.origin + location.pathname, "$refe
 // Halloween drips that look like the real thing: glossy paint runs off the bottom of the Join Discord and Get RotoBot
 // buttons and green slime off the top of the RotoBot card. Each run swells into a bead; some let a drop go, which
 // falls, splats where it lands and leaves a puddle that soaks away, and the run pulls back and fills again. Now and
-// then a drop of blood forms on a drip of the name and falls onto the tombstones. Drawn on one see-through canvas over
-// the page that never takes a tap.
+// then a drop of blood forms on a drip of the name and falls onto the tombstones. Drawn on one see-through canvas laid
+// over the name and the two cards inside the page, so it scrolls with them in one piece; it never takes a tap.
 (() => {
   if (!document.documentElement.classList.contains("spooky")) return;
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const cv = document.getElementById("drips"), g = cv.getContext("2d");
+  const cv = document.getElementById("drips"), g = cv.getContext("2d"), wrap = cv.parentElement;
   const rnd = (a, b) => a + Math.random() * (b - a);
   const $ = (q) => document.querySelector(q);
-  const box = (q) => $(q).getBoundingClientRect();
+  // Everything is measured from the canvas's own corner (OX, OY: where it is on screen right now), which moves with the
+  // page, so it doesn't matter how far the page has scrolled or whether a frame lands mid-scroll.
+  let OX = 0, OY = 0;
+  const local = (r) => ({ left: r.left - OX, right: r.right - OX, top: r.top - OY, bottom: r.bottom - OY });
+  const box = (q) => local($(q).getBoundingClientRect());
+  const corner = () => { const c = cv.getBoundingClientRect(); OX = c.left; OY = c.top; };
   const PAINT = {
     blue: { base: "#5865f2", light: "#a3abff", dark: "#28319a" },
     orange: { base: "#ff7a1a", light: "#ffbd7a", dark: "#9c3d08" },
@@ -1053,11 +1058,16 @@ track("$pageview", { "$current_url": location.origin + location.pathname, "$refe
   }
   let W = 0, H = 0, last = 0, drops = [], bits = [], puddles = [], beads = [], tips = [];
 
-  function fit() {
+  function fit() {  // from just above the name to just below the RotoBot card
+    const w = wrap.getBoundingClientRect(), name = $("h1").getBoundingClientRect(), card = $(".rb").getBoundingClientRect();
     const d = Math.min(2, devicePixelRatio || 1);
-    W = innerWidth; H = innerHeight;
+    W = Math.ceil(w.width); H = Math.ceil(card.bottom - name.top + 50);
+    Object.assign(cv.style, { top: Math.floor(name.top - w.top - 10) + "px", width: W + "px", height: H + "px" });
     cv.width = Math.round(W * d); cv.height = Math.round(H * d);
     g.setTransform(d, 0, 0, d, 0, 0);
+    corner();
+    findTips();
+    if (still) frame(0);
   }
   const across = (p, x0, x1) => {  // liquid is round: dark at the sides, a highlight just left of the middle
     const s = g.createLinearGradient(x0, 0, x1, 0);
@@ -1132,25 +1142,26 @@ track("$pageview", { "$current_url": location.origin + location.pathname, "$refe
     for (let col = 3; col < low.length - 3; col++) {
       const y = low[col];
       if (y < base + size * 0.06 || low.slice(col - 3, col + 4).some((v, i) => v > y || (v === y && i < 3))) continue;
-      tips.push({ x: rr.left + scrollX + col + 0.5, y: rr.top + scrollY + y });
+      tips.push({ x: rr.left - OX + col + 0.5, y: rr.top - OY + y });
     }
   }
   const floorUnder = (x) => {  // the top of the tombstone under it, or the hill between them
     for (const a of document.querySelectorAll(".socials a")) {
-      const r = a.getBoundingClientRect();
-      if (x - scrollX >= r.left + 2 && x - scrollX <= r.right - 2) return r.top + scrollY + 3;
+      const r = local(a.getBoundingClientRect());
+      if (x >= r.left + 2 && x <= r.right - 2) return r.top + 3;
     }
-    return box(".socials").bottom + scrollY + 24;
+    return box(".socials").bottom + 24;
   };
 
   function frame(t) {
-    const dt = Math.min(0.05, (t - (last || t)) / 1000), sx = scrollX, sy = scrollY;
+    const dt = Math.min(0.05, (t - (last || t)) / 1000);
     last = t;
+    corner();
     g.clearRect(0, 0, W, H);
 
     puddles = puddles.filter((u) => (u.age += dt * 1000) < u.life);
     for (const u of puddles) {
-      const k = Math.min(1, u.age / 120), x = u.x - sx, y = u.y - sy;
+      const k = Math.min(1, u.age / 120), x = u.x, y = u.y;
       g.globalAlpha = Math.min(1, (u.life - u.age) / (u.life * 0.4));
       g.beginPath(); g.ellipse(x, y, u.w * k, u.w * 0.26 * k + 0.5, 0, 0, Math.PI * 2);
       g.fillStyle = across(u.p, x - u.w, x + u.w); g.fill();
@@ -1160,26 +1171,24 @@ track("$pageview", { "$current_url": location.origin + location.pathname, "$refe
     }
 
     for (const s of SURFACES) {
-      const el = $(s.q);
-      if (!el) continue;
-      const [x0, x1, y] = s.edge(el.getBoundingClientRect()), seen = y > -40 && y < H + 10;
-      if (seen) lip(s.paint, x0, x1, y, t, s.phase);
+      const [x0, x1, y] = s.edge(box(s.q));
+      lip(s.paint, x0, x1, y, t, s.phase);
       for (const u of s.list) {
         const x = x0 + (x1 - x0) * u.at;
         if (!still) {
           if (u.len < u.max) u.len = Math.min(u.max, u.len + u.speed * dt);
           else if (u.drips) {
-            fall(s.paint, x + sx, y + 3 + u.len + sy, u.w * 0.62, s.floor() + sy);
+            fall(s.paint, x, y + 3 + u.len, u.w * 0.62, s.floor());
             u.len = u.max * rnd(0.3, 0.5); u.max = rnd(...s.len); u.speed = rnd(1.2, 3.4);
           }
         }
-        if (seen) run(s.paint, x, y + 3, u.w, u.len + (still ? 0 : 0.6 * Math.sin(t / 700 + u.wob)), Math.min(1, u.len / u.max));
+        run(s.paint, x, y + 3, u.w, u.len + (still ? 0 : 0.6 * Math.sin(t / 700 + u.wob)), Math.min(1, u.len / u.max));
       }
     }
 
     beads = beads.filter((b) => {
       b.age += dt * 1000;
-      const r = b.max * Math.min(1, b.age / b.grow), x = b.x - sx, y = b.y - sy;
+      const r = b.max * Math.min(1, b.age / b.grow), x = b.x, y = b.y;
       if (b.age > b.grow + 200) { fall(PAINT.blood, b.x, b.y + r, r, floorUnder(b.x)); return false; }
       g.beginPath();
       g.moveTo(x - r * 0.45, y - 0.5); g.lineTo(x + r * 0.45, y - 0.5);
@@ -1193,28 +1202,27 @@ track("$pageview", { "$current_url": location.origin + location.pathname, "$refe
     for (const d of drops) {
       d.vy += 1500 * dt; d.y += d.vy * dt;
       if (d.y + d.r >= d.floor) { splat(d); d.gone = true; continue; }
-      const k = Math.min(0.5, d.vy / 1100), rx = d.r * (1 - k * 0.3), ry = d.r * (1 + k), x = d.x - sx, y = d.y - sy;
+      const k = Math.min(0.5, d.vy / 1100), rx = d.r * (1 - k * 0.3), ry = d.r * (1 + k), x = d.x, y = d.y;
       g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
       shadow(true); g.fillStyle = across(d.p, x - rx, x + rx); g.fill(); shadow(false);
       gloss(x, y, Math.min(rx, ry));
     }
-    drops = drops.filter((d) => !d.gone && d.y - sy < H + 40);
+    drops = drops.filter((d) => !d.gone && d.y < H + 40);
 
     bits = bits.filter((b) => (b.age += dt * 1000) < b.life);
     for (const b of bits) {
       b.vy += 900 * dt; b.x += b.vx * dt; b.y += b.vy * dt;
       g.globalAlpha = 1 - b.age / b.life;
       g.fillStyle = b.p.base;
-      g.beginPath(); g.arc(b.x - sx, b.y - sy, b.r, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.arc(b.x, b.y, b.r, 0, Math.PI * 2); g.fill();
       g.globalAlpha = 1;
     }
     if (!still) requestAnimationFrame(frame);
   }
 
-  fit();
-  addEventListener("resize", () => { fit(); findTips(); if (still) frame(0); });
-  document.fonts?.ready.then(findTips);
-  if (still) { addEventListener("scroll", () => frame(0), { passive: true }); frame(0); return; }
+  new ResizeObserver(fit).observe(wrap);  // first fit now, then whenever the page reflows (fonts, the LIVE banner, rotation)
+  document.fonts?.ready.then(fit);
+  if (still) return;
   requestAnimationFrame(frame);
   const drip = () => {
     if (!document.hidden && tips.length) {
