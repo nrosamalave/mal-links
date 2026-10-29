@@ -1,8 +1,8 @@
 # Mal's links
 
 The link in Mal's TikTok bio: **links.askmal.live**. One page (`index.html`) in the Ask Mal LIVE arcade look:
-Season Ticket (free Discord, via ticket.askmal.live/plans), RotoBot with code MAL, Ask Mal LIVE, YouTube and X, with
-fireworks and a biplane dogfight in the sky.
+Season Ticket (free Discord, via ticket.askmal.live/plans), RotoBot with code MAL, Ask Mal LIVE, YouTube and X, dressed
+for the season.
 
 - **Always on.** It's on GitHub Pages (free), separate from Ask Mal LIVE, so it never sleeps and editing it never
   restarts askmal.live or clears the line. (Render's free plan is out of custom domains: askmal.live and
@@ -10,9 +10,24 @@ fireworks and a biplane dogfight in the sky.
 - **LIVE banner.** The page asks `https://askmal.live/api/status` every 20 s and shows "Mal is LIVE now" while the line
   is open and the stream overlay is running.
 - **Taps** go to Ask Mal's `/api/t` → PostHog: `$pageview` (page `links`) and `link_tap` with `to` = which link.
-- **Halloween look** (`html.spooky`): a haunted hill under a full moon, blood-red name, bats, lightning, a ghost, a
-  witch, a spider. It's on until 6 AM ET Monday Nov 2, 2026, then the normal look returns by itself (the date is in the
-  small script in `<head>`). Preview either look with `?spooky=1` / `?spooky=0`.
+
+## Looks
+
+The page picks its look from the date, Eastern time (the small script in `<head>`); nobody has to switch anything.
+Each look is a pixel scene behind the page plus touches on the cards, in `looks/<name>.js` on the shared `looks/kit.js`,
+with its colors in `index.html` under `html.<name>`. Preview any look with `?look=fall` (or winter, spring, summer,
+halloween).
+
+| Look | When | What moves |
+|---|---|---|
+| Fall | Sep 22 to Dec 20 | Harvest sunset: leaves fall, gust across and settle on the cards; geese; a MAL blimp; sun rays |
+| Winter | Dec 21 to Mar 19 | Snowy night: northern lights; snow on the name and cards; icicles drip; chimney smoke; shooting stars |
+| Spring | Mar 20 to Jun 20 | Fresh morning: a shower then a rainbow; a turning windmill; butterflies; blossoms on the cards |
+| Summer | Jun 21 to Sep 21 | Synthwave beach: striped sun; a dolphin leaps; fireworks; the biplane dogfight; the RotoBot card's neon buzzes |
+| Halloween | Oct 24 until the first weekday morning after Oct 31 | Haunted hill: bats, lightning, a ghost, a witch, drips |
+
+Holidays take over from 7 days before the day until 6 AM on the next weekday after it (`HOLIDAYS` in the `<head>`
+script); a holiday look needs its own `looks/<name>.js` and colors. Days turn over at 6 AM Eastern.
 
 ## Change a link
 
