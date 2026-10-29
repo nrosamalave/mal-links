@@ -1,7 +1,9 @@
 // Fall: a harvest sunset, football weather. The sun going down behind the hill at the icons with long rays and lit
 // streaks of cloud, the far hills with a little stadium's lights on, a red barn and silo, maples in full color, round
-// hay bales, plowed fields. Leaves drift down in front of the page and some settle on the cards until a gust takes them;
-// geese go over in a V, and now and then a blimp with MAL on its side.
+// hay bales, plowed fields. Leaves drift down in front of the page and some settle on the cards until a gust takes them,
+// and now and then a little whirlwind of them spins across; geese go over in a V, a football spirals across the sky,
+// crows drop onto the hay bales to peck about, now and then a blimp with MAL on its side. A squirrel runs along the
+// cards, sits up to nibble an acorn and dashes off.
 import { art, dither, every, layer, pick, rnd, scene, screen, seeded, sky, steps, still, tick, trim } from "./kit.js";
 
 const LEAF = [  // a maple leaf tumbling: face on, turning, edge on, upside down
@@ -28,11 +30,32 @@ const BLIMP = [0, 1].map((blink) => layer(31, 11, (b) => {  // nose left, MAL on
   MAL.forEach((row, y) => [...row].forEach((ch, x) => ch === "#" && b.fillRect(6 + x, 2 + y, 1, 1)));
   b.fillStyle = blink ? "#ff5a4a" : "#5a1f2a"; b.fillRect(30, 5, 1, 1);
 }));
+const FOOTBALL = [1, 2, 3, -1].map((lace) => layer(11, 6, (b) => {  // spiraling: the laces come round every four frames
+  for (let y = 0; y < 6; y++) for (let x = 0; x < 11; x++) {
+    const nx = (x - 5) / 5.4, ny = (y - 2.5) / 2.9;
+    if (nx * nx + ny * ny > 1) continue;
+    b.fillStyle = ny < -0.4 ? "#c47a40" : ny < 0.4 ? "#8a4a22" : "#5e2e14";
+    b.fillRect(x, y, 1, 1);
+  }
+  if (lace >= 0) for (let x = 3; x <= 7; x++) { b.fillStyle = x % 2 ? "#fff4dc" : "#d8c4a0"; b.fillRect(x, lace, 1, 1); }
+}));
+const SQ = { t: "#b0582a", T: "#f0a860", b: "#c8683a", h: "#c8683a", k: "#7a3a1c", e: "#1a0a08", n: "#3a1a0c", a: "#6a3a1a", A: "#d8963a", l: "#e8c49a" };
+const SQUIRREL = {  // facing right
+  run: [["..TTT.......", ".TtttT......", "TtTttT......", "T..ttt...k..", "....tt..hhhe", "....tbbbbhhn", "...bbbbbbl..", "..bb....bb.."],
+    ["............", "..TTT.......", ".TtttT...k..", "TtT.ttT.hhhe", "T....tbbbhhn", "....bbbbbl..", "....bbbbb...", ".....b.b...."]].map((rows) => art(rows, SQ)),
+  sit: art([".TTT........", "TtttT.......", "TtTttT......", "Tt.tttT..k..", "T...ttt.hhh.", ".....tthhheh", ".....ttbhhhn", "....ttbbbaA.", "....tbbblAa.", "....tbbbll..", "....bbb.bb.."], SQ),
+  nibble: art([".TTT........", "TtttT.......", "TtTttT......", "Tt.tttT..k..", "T...ttt.hhh.", ".....tthhheh", ".....ttbhhhA", "....ttbbbbAa", "....tbbblll.", "....tbbbll..", "....bbb.bb.."], SQ),
+};
+const CROW = {  // perched facing right, and two wingbeats
+  perch: art(["..kk..", ".kkkkb", "kkkk..", ".kkk..", "..k.k."], { k: "#1a0a14", b: "#4a3020" }),
+  peck: art(["......", ".kk...", "kkkk..", ".kkkk.", "..k.kb"], { k: "#1a0a14", b: "#4a3020" }),
+  fly: [["#...#", ".#.#.", "..#.."], [".....", "#####", "..#.."]].map((rows) => art(rows, { "#": "#1a0a14" })),
+};
 const pal = { red: ["#ffa448", "#d2502a", "#9a3020", "#5e1a14"], orange: ["#ffbb55", "#e8742a", "#a8441c", "#62240e"],
   gold: ["#ffd76a", "#e6a632", "#a0661a", "#5a3410"] };
 
 let g, W = 0, H = 0, S = null;
-const behind = steps();
+const behind = steps(), over = steps();
 
 function build(spot) {
   const r = seeded(921);
@@ -42,7 +65,7 @@ function build(spot) {
   const bx = Math.round(W - Math.max(26, W * 0.13)), tx = Math.round(Math.max(10, W * 0.06)), sx = Math.round(W > 300 ? cx - 140 : Math.max(W * 0.24, cx - R - 22));  // the stadium clear of the name on wide screens
   const far = (x) => Math.round(ground - 7 - 3 * Math.sin(x * 0.04 + 0.8) - 2 * Math.sin(x * 0.11));
   const ridge = (x) => Math.round(ground - 2 * Math.sin(x * 0.05 + 1.3) - 1.5 * Math.sin(x * 0.13 + 0.4) - hump(x, bx, 24, 5) - hump(x, tx, 20, 4));
-  S = { sun, ground, ridge, lamps: [], windows: [] };
+  S = { sun, ground, ridge, lamps: [], windows: [], bales: [] };
 
   S.back = layer(W, H, (b) => {
     sky(b, W, H, ["#1e0f2c", "#2b1238", "#3e163c", "#57193d", "#74223c", "#952f37", "#b74431", "#d6612b", "#ec8a2f", "#f7b347"], ground);
@@ -186,6 +209,57 @@ function bale(f, x, y) {  // a round hay bale, its rolled end toward us
     f.fillRect(x + px, y + py, 1, 1);
   }
   f.fillStyle = "rgba(0, 0, 0, 0.4)"; f.fillRect(x - 4, y + 5, 10, 1);
+  S.bales.push({ x, top: y - 4 });
+}
+
+function football() {  // a long pass from one side of the sky to the other, spiraling
+  const dir = Math.random() < 0.5 ? 1 : -1, time = rnd(2.4, 3.2), y0 = S.ground - rnd(6, 24), y1 = S.ground - rnd(6, 24), high = rnd(S.ground * 0.45, S.ground * 0.7);
+  const x0 = dir > 0 ? -12 : W + 12, span = dir * (W + 24);
+  let t0 = null;
+  return (t) => {
+    t0 ??= t;
+    const k = (t - t0) / 1000 / time;
+    if (k > 1) return false;
+    const y = y0 + (y1 - y0) * k - 4 * high * k * (1 - k);
+    g.save();
+    g.translate(Math.round(x0 + span * k), Math.round(y));
+    g.rotate(Math.atan2(y1 - y0 - 4 * high * (1 - 2 * k), Math.abs(span)) * dir);  // nose along the flight
+    if (dir < 0) g.scale(-1, 1);
+    g.drawImage(FOOTBALL[Math.floor(t / 70) % 4], -5, -3);
+    g.restore();
+    return true;
+  };
+}
+
+function crow() {  // flaps down onto a hay bale from its own side, pecks about, turns round, and flies off
+  const b = pick(S.bales), from = b.x < W / 2 ? -1 : 1, stay = rnd(4, 7);
+  const sky = { x: b.x + from * rnd(45, 75), y: rnd(6, S.ground * 0.5) }, perch = { x: b.x - 3, y: b.top - 5 };
+  let t0 = null;
+  return (t) => {
+    t0 ??= t;
+    const e = (t - t0) / 1000;
+    let x, y, img, face = -from;
+    if (e < 2) {
+      const k = e / 2, ease = 1 - (1 - k) ** 2;
+      x = sky.x + (perch.x - sky.x) * ease; y = sky.y + (perch.y - sky.y) * k ** 0.7;
+      img = k > 0.9 ? CROW.perch : CROW.fly[Math.floor(t / 110) % 2];
+    } else if (e < 2 + stay) {
+      x = perch.x; y = perch.y;
+      img = Math.sin(e * 3.1) * Math.sin(e * 1.3) > 0.35 ? CROW.peck : CROW.perch;
+      if (e > 2 + stay * 0.6) face = from;
+    } else {
+      const k = (e - 2 - stay) / 2;
+      if (k > 1) return false;
+      x = perch.x + from * k * 90; y = perch.y - k * 70 - 8 * Math.sin(k * Math.PI);
+      img = CROW.fly[Math.floor(t / 110) % 2];
+    }
+    g.save();
+    g.translate(Math.round(x), Math.round(y));
+    if (face < 0) { g.scale(-1, 1); g.translate(-img.width, 0); }
+    g.drawImage(img, 0, 0);
+    g.restore();
+    return true;
+  };
 }
 
 function geese() {  // a V of geese across the sky, wings beating out of step
@@ -248,11 +322,14 @@ function frame(t) {
   g.restore();
   for (const l of S.lamps) { g.fillStyle = "#fff6dc"; g.fillRect(l.x, l.y, 5, 2); }
   for (const w of S.windows) { g.fillStyle = Math.sin(t / 400) * Math.sin(t / 170) > 0.8 ? "#ffb04a" : "#ffd27a"; g.fillRect(w.x, w.y, w.w, w.h); }
+  over.run(t);
 }
 
 scene((ctx, w, h, spot) => { g = ctx; W = w; H = h; build(spot); return frame; });
 every(() => behind.add(geese()), 16, 26, 3);
 every(() => behind.add(blimp()), 75, 110, 6);
+every(() => behind.add(football()), 14, 24, 1.5);
+every(() => { if (!over.size) over.add(crow()); }, 9, 16, 4);
 
 // Leaves in front of the page: a few always drifting down, and now and then a gust of them
 if (!still) {
@@ -266,9 +343,32 @@ if (!still) {
     for (let i = 0, n = 10 + Math.floor(Math.random() * 8); i < n; i++)
       leaves.push(leaf({ x: dir > 0 ? -rnd(10, 200) : F.W + rnd(10, 200), y: rnd(0, F.H * 0.75), vx: dir * rnd(150, 260), vy: rnd(5, 30), gust: true }));
   }, 11, 18, 5);
+  let whirls = [];
+  every(() => {  // a little whirlwind: leaves spinning up a funnel as it wanders across the bottom of the screen
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    whirls.push({ dir, x: dir > 0 ? -50 : F.W + 50, y: F.H * rnd(0.62, 0.88), v: rnd(45, 70),
+      bits: Array.from({ length: 22 }, (_, i) => ({ a: rnd(0, 6.3), up: (i / 22) * 110, spin: rnd(3.5, 5.5), c: pick(LEAVES), phase: rnd(0, 6) })) });
+  }, 22, 36, 8);
   tick((t, dt) => {
     const { g: c, W: w, H: h } = F;
     c.clearRect(0, 0, w, h);
+    for (const wh of whirls) {
+      wh.x += wh.dir * wh.v * dt;
+      const sway = 10 * Math.sin(t / 700);
+      c.strokeStyle = "rgba(255, 214, 160, 0.22)"; c.lineWidth = 1.5;  // the dust swirling round the funnel
+      for (let k = 0; k < 5; k++) {
+        const up = 8 + k * 22, r = 6 + up * 0.32, a = t / 160 + k * 1.9;
+        c.beginPath(); c.ellipse(wh.x + sway * (up / 110), wh.y - up, r, r * 0.22, 0, a, a + 2.2); c.stroke();
+      }
+      for (const b of wh.bits) {
+        b.a += b.spin * dt; b.up = (b.up + 34 * dt) % 110;
+        const r = 5 + b.up * 0.32, near = Math.sin(b.a) > 0, size = near ? 12 : 8;
+        c.globalAlpha = Math.min(1, (110 - b.up) / 30, b.up / 8);
+        c.drawImage(b.c[Math.floor((t + b.phase * 100) / 130) % 4], Math.round(wh.x + Math.cos(b.a) * r + sway * (b.up / 110)), Math.round(wh.y - b.up + Math.sin(b.a) * r * 0.22), size, size);
+      }
+      c.globalAlpha = 1;
+    }
+    whirls = whirls.filter((wh) => wh.x > -80 && wh.x < w + 80);
     wind *= 1 - 0.7 * dt;
     for (const l of leaves) {
       l.y += l.vy * dt;
@@ -283,9 +383,9 @@ if (!still) {
 }
 
 // Leaves that settle on the cards: one drifts down onto the top of a card or an icon, rests there a while, then a gust
-// lifts it off and away.
+// lifts it off and away. And now and then the squirrel.
 {
-  let T = null, landing = [];
+  let T = null, landing = [], critter = null;
   const tops = () => [
     ...[...document.querySelectorAll(".socials a")].map((a) => [T.box(a), 0]),
     [T.box(".ticket"), -4], [T.box(".rb"), 0], ...[...document.querySelectorAll(".row")].map((a) => [T.box(a), 0]),
@@ -294,13 +394,38 @@ if (!still) {
     const [b, lift] = pick(tops()), x = rnd(b.left + 4, b.right - 14), y = b.top + lift - 8;
     return { c: pick(LEAVES), x, y: rest ? y : y - rnd(70, 150), floor: y, phase: rnd(0, 6), rest: rest ? 1e9 : rnd(5000, 12000), face: Math.random() < 0.5 ? 0 : 1, age: 0 };
   };
+  const squirrel = () => {  // runs in along the top of a card, sits up to nibble an acorn, then dashes off the other end
+    const wide = tops().filter(([b]) => b.width > 150), seen = wide.filter(([b]) => b.top + T.y > 60 && b.top + T.y < innerHeight - 40);  // a card on screen
+    const [b, lift] = pick(seen.length ? seen : wide), dir = Math.random() < 0.5 ? 1 : -1, speed = 170, sit = rnd(2.5, 4.5);
+    const floor = b.top + lift + 1, start = dir > 0 ? -26 : T.W + 2, stop = b.left + b.width * rnd(0.25, 0.75) - 12, end = dir > 0 ? T.W + 2 : -26;
+    const there = Math.abs(stop - start) / speed, gone = there + sit + Math.abs(end - stop) / speed;
+    let t0 = null;
+    return (c, t) => {
+      t0 ??= t;
+      const e = (t - t0) / 1000;
+      if (e > gone) return false;
+      const running = e < there || e > there + sit, x = e < there ? start + dir * speed * e : e < there + sit ? stop : stop + dir * speed * (e - there - sit);
+      const img = running ? SQUIRREL.run[Math.floor(t / 70) % 2] : Math.sin((e - there) * 9) > 0.2 && e - there > 0.5 ? SQUIRREL.nibble : SQUIRREL.sit;
+      c.save();
+      c.translate(Math.round(x), floor - img.height * 2 - (running ? (Math.floor(t / 70) % 2) * 2 : 0));
+      if (dir < 0) { c.scale(-1, 1); c.translate(-24, 0); }
+      c.drawImage(img, 0, 0, img.width * 2, img.height * 2);
+      c.restore();
+      return true;
+    };
+  };
   trim("a.row:last-of-type", {
     fit(layer) {
       T = layer;
       T.g.imageSmoothingEnabled = false;
-      if (still) landing = [land(true), land(true), land(true)];
+      if (still) {
+        landing = [land(true), land(true), land(true)];
+        const rb = T.box(".rb");
+        critter = (c) => (c.drawImage(SQUIRREL.sit, Math.round(rb.right - 70), rb.top - 21, 24, 22), true);  // sitting on the RotoBot card
+      }
     },
     frame({ g: c }, t, dt) {
+      if (critter && !critter(c, t)) critter = null;
       for (const l of landing) {
         l.age += dt * 1000;
         if (l.y < l.floor) {  // drifting down
@@ -322,4 +447,5 @@ if (!still) {
     },
   });
   every(() => { if (T && landing.length < 5) landing.push(land(false)); }, 2.5, 5.5, 1.5);
+  every(() => { if (T && !critter) critter = squirrel(); }, 14, 24, 3);
 }

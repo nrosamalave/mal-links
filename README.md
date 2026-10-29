@@ -20,10 +20,10 @@ halloween).
 
 | Look | When | What moves |
 |---|---|---|
-| Fall | Sep 22 to Dec 20 | Harvest sunset: leaves fall, gust across and settle on the cards; geese; a MAL blimp; sun rays |
-| Winter | Dec 21 to Mar 19 | Snowy night: northern lights; snow on the name and cards; icicles drip; chimney smoke; shooting stars |
-| Spring | Mar 20 to Jun 20 | Fresh morning: a shower then a rainbow; a turning windmill; butterflies; blossoms on the cards |
-| Summer | Jun 21 to Sep 21 | Synthwave beach: striped sun; a dolphin leaps; fireworks; the biplane dogfight; the RotoBot card's neon buzzes |
+| Fall | Sep 22 to Dec 20 | Harvest sunset: leaves fall, gust across, whirl and settle on the cards; a squirrel on the cards; a football pass; crows on the hay bales; geese; a MAL blimp; sun rays |
+| Winter | Dec 21 to Mar 19 | Snowy night: northern lights; clouds past the moon; snow on the name and cards, blown off in gusts; snowballs hit the cards; a cardinal; a fox pounces into the snow; icicles drip; chimney smoke; shooting stars |
+| Spring | Mar 20 to Jun 20 | Fresh morning: a shower then a rainbow; a hot-air balloon; a bunny; bees round the flowers on the name; a ladybug on the cards; a turning windmill; butterflies; blossoms on the cards |
+| Summer | Jun 21 to Sep 21 | Synthwave beach: striped sun; a dolphin leaps; gulls; fireflies; a crab on the cards; a beach ball bouncing by; fireworks; the biplane dogfight; the RotoBot card's neon buzzes |
 | Halloween | Oct 24 until the first weekday morning after Oct 31 | Haunted hill: bats, lightning, a ghost, a witch, drips |
 
 Holidays take over from 7 days before the day until 6 AM on the next weekday after it (`HOLIDAYS` in the `<head>`

@@ -1,20 +1,31 @@
 // Summer: a synthwave beach night, the arcade look's home. A big striped retro sun sinking into the sea under a
 // magenta sky, its reflection shimmering on the water, palms leaning in from both sides, waves on the sand, a sailboat on
-// the horizon, now and then a dolphin leaping. Fireworks over the water, the two biplanes' dogfight, and the RotoBot
-// card's neon frame buzzing (in the page's styles).
-import { art, dither, every, layer, rgb, rnd, scene, screen, seeded, sky, steps, still, tick } from "./kit.js";
+// the horizon, now and then a dolphin leaping, gulls gliding over and fireflies blinking round the palms. Fireworks over
+// the water, the two biplanes' dogfight, and the RotoBot card's neon frame buzzing (in the page's styles). On the page,
+// a crab scuttles along the cards to snap its claws, and now and then a beach ball bounces across the bottom.
+import { art, dither, every, layer, pick, rgb, rnd, scene, screen, seeded, sky, steps, still, tick, trim } from "./kit.js";
 
 let g, W = 0, H = 0, S = null;
 const behind = steps();
 const SUN = ["#fff27a", "#ffd24a", "#ffa63d", "#ff7046", "#ff3e8a"];
 const DOLPHIN = art(["......h.......", "....hhhhhhh...", "..h##########.", ".#############", "#...b######...", "##............"],
   { h: "#ffb0d4", "#": "#c2589c", b: "#8a3a7a" });  // lit pink by the sunset, so it shows against the dark sea
+const GULL = [[".ww...ww.", "w..www..w", "....w...."], ["w.......w", ".ww.w.ww.", "...www..."]].map((rows) => art(rows, { w: "#ffd8ea" }));
+const CR = { c: "#ff4a64", C: "#ffb0bc", e: "#0b0620" };
+const CRAB = {
+  walk: [["c.......c", "cC.....Cc", ".c.e.e.c.", "..ccccc..", ".cCCCCCc.", "c.c...c.c"], ["c.......c", "cC.....Cc", ".c.e.e.c.", "..ccccc..", ".cCCCCCc.", ".c.c.c.c."]].map((rows) => art(rows, CR)),
+  snap: art(["cc.....cc", "c.c...c.c", ".c.e.e.c.", "..ccccc..", ".cCCCCCc.", "c.c...c.c"], CR),
+};
 
 function build(spot) {
   const r = seeded(621);
   const { cx, ground } = spot, R = Math.round(Math.min(W * 0.3, 72));
   const beach = Math.round(ground + Math.max(40, (H - ground) * 0.5));
   S = { ground, beach, sun: { x: cx, y: ground, R } };
+  S.flies = Array.from({ length: Math.round(W / 9) }, () => {  // round the palms beside the name, and a few out over the water
+    const side = r() < 0.5, x = r() < 0.8 ? (side ? r() * W * 0.24 : W - r() * W * 0.24) : r() * W;
+    return { x, y: ground * (0.35 + r() * 0.6), rate: 500 + r() * 450, phase: r() * 6.3 };
+  });
 
   const colors = ["#12052e", "#1d0739", "#2b0a46", "#3d0c52", "#55105c", "#721662", "#951f63", "#b82b60", "#d83f58", "#ef5c4e", "#ff8448"];
   S.sky = layer(W, ground + 1, (b) => {
@@ -152,11 +163,100 @@ function frame(t) {
   for (let x = 0; x < W; x++) g.fillRect(x, Math.round(beach + 1 + wash * 2 + Math.sin(x * 0.15 + t / 700) * 1.2), 1, 1);
   if (S.dolphin && !S.dolphin(t)) S.dolphin = null;
   g.drawImage(S.palms, 0, 0);
+  g.save();
+  g.globalCompositeOperation = "lighter";
+  for (const f of S.flies) {  // fireflies, each glowing up and fading on its own beat
+    const glow = Math.max(0, Math.sin(t / f.rate + f.phase)) ** 3;
+    if (glow < 0.05) continue;
+    const x = f.x + 6 * Math.sin(t / 1900 + f.phase) + 2 * Math.sin(t / 470 + f.phase * 3), y = f.y + 4 * Math.sin(t / 1300 + f.phase * 2);
+    const s = g.createRadialGradient(x, y, 0, x, y, 6);
+    s.addColorStop(0, `rgba(190, 255, 110, ${0.9 * glow})`); s.addColorStop(0.4, `rgba(160, 255, 90, ${0.35 * glow})`); s.addColorStop(1, "rgba(160, 255, 90, 0)");
+    g.fillStyle = s; g.fillRect(x - 6, y - 6, 12, 12);
+    g.fillStyle = `rgba(250, 255, 200, ${glow})`; g.fillRect(Math.round(x), Math.round(y), 2, 1);
+  }
+  g.restore();
+}
+
+function gulls() {  // one to three gulls gliding across, a few wingbeats now and then
+  const dir = Math.random() < 0.5 ? 1 : -1, y = rnd(8, S.ground * 0.5), speed = rnd(14, 22);
+  const flock = Array.from({ length: 1 + Math.floor(Math.random() * 3) }, (_, i) => ({ dx: -i * rnd(12, 22), dy: rnd(-8, 8), phase: rnd(0, 6) }));
+  let t0 = null;
+  return (t) => {
+    t0 ??= t;
+    const e = (t - t0) / 1000, lead = (dir > 0 ? -10 : W + 10) + dir * speed * e;
+    for (const b of flock) {
+      const img = Math.sin(e * 1.3 + b.phase) > 0.75 ? GULL[Math.floor(t / 140) % 2] : GULL[0];
+      g.drawImage(img, Math.round(lead + dir * b.dx), Math.round(y + b.dy + 3 * Math.sin(e * 0.8 + b.phase)));
+    }
+    return dir > 0 ? lead - 70 < W : lead + 70 > 0;
+  };
 }
 
 scene((ctx, w, h, spot) => { g = ctx; W = w; H = h; build(spot); return frame; });
 every(() => behind.add(sailboat()), 40, 70, 3);
 every(() => S.dolphin = dolphin(), 7, 13, 2);
+every(() => behind.add(gulls()), 10, 18, 1);
+
+// A crab on the cards: it scuttles sideways in along the top of one, stops to snap its claws, and scuttles off
+{
+  let T = null, crab = null;
+  const scuttle = () => {
+    const cards = [[T.box(".ticket"), -4], [T.box(".rb"), 0], ...[...document.querySelectorAll(".row")].map((a) => [T.box(a), 0])].filter(([b]) => b.width > 0);
+    const on = cards.filter(([b]) => b.top + T.y > 60 && b.top + T.y < innerHeight - 40), [b, lift] = pick(on.length ? on : cards);
+    const dir = Math.random() < 0.5 ? 1 : -1, speed = 75, pause = rnd(2, 3.5), floor = b.top + lift + 1;
+    const start = dir > 0 ? -28 : T.W + 2, stop = b.left + b.width * rnd(0.2, 0.8) - 13, end = dir > 0 ? T.W + 2 : -28;
+    const there = Math.abs(stop - start) / speed, gone = there + pause + Math.abs(end - stop) / speed;
+    let t0 = null;
+    return (c, t) => {
+      t0 ??= t;
+      const e = (t - t0) / 1000;
+      if (e > gone) return false;
+      const walking = e < there || e > there + pause, step = Math.floor(t / 80) % 2;
+      const x = e < there ? start + dir * speed * e : e < there + pause ? stop : stop + dir * speed * (e - there - pause);
+      const img = walking ? CRAB.walk[step] : e - there < 1.4 && Math.floor(t / 180) % 2 ? CRAB.snap : CRAB.walk[0];
+      c.drawImage(img, Math.round(x), floor - 18 - (walking ? step * 2 : 0), 27, 18);
+      return true;
+    };
+  };
+  trim("a.row:last-of-type", {
+    fit(layer) {
+      T = layer;
+      T.g.imageSmoothingEnabled = false;
+      if (still) { const rb = T.box(".rb"); crab = (c) => (c.drawImage(CRAB.walk[0], Math.round(rb.right - 64), rb.top - 17, 27, 18), true); }
+    },
+    frame({ g: c }, t) { if (crab && !crab(c, t)) crab = null; },
+  });
+  every(() => { if (T && !crab) crab = scuttle(); }, 12, 22, 3);
+}
+
+// A beach ball bouncing across the bottom of the screen, spinning, a little lower each bounce
+if (!still) {
+  const F = screen("#front"), balls = steps(), PANELS = ["#ff3ea5", "#ffffff", "#22e1ff", "#ffffff", "#ffd23f", "#ffffff"];
+  const beachBall = () => {
+    const dir = Math.random() < 0.5 ? 1 : -1, R = 13, floor = F.H - rnd(30, 70), speed = rnd(80, 110), high = rnd(80, 130), period = 1.1;
+    let t0 = null;
+    return (t) => {
+      t0 ??= t;
+      const e = (t - t0) / 1000, x = (dir > 0 ? -R - 2 : F.W + R + 2) + dir * speed * e, c = F.g;
+      const b = e / period + 0.5, k = b % 1, h = high * 0.78 ** Math.floor(b), y = floor - R - 4 * h * k * (1 - k);
+      c.fillStyle = `rgba(11, 6, 32, ${0.3 * (1 - (floor - R - y) / (high + 1))})`;  // its shadow on the ground
+      c.beginPath(); c.ellipse(x, floor, R * (1 - 0.4 * (floor - R - y) / (high + 1)), 3, 0, 0, Math.PI * 2); c.fill();
+      c.save();
+      c.translate(x, y); c.rotate((dir * (x + 40)) / R);
+      PANELS.forEach((p, i) => { c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, R, (i * Math.PI) / 3, ((i + 1) * Math.PI) / 3); c.fillStyle = p; c.fill(); });
+      c.restore();
+      c.fillStyle = "#ffffff"; c.beginPath(); c.arc(x, y, R * 0.22, 0, Math.PI * 2); c.fill();
+      const s = c.createRadialGradient(x - R * 0.35, y - R * 0.35, R * 0.2, x, y, R);
+      s.addColorStop(0.55, "rgba(11, 6, 32, 0)"); s.addColorStop(1, "rgba(11, 6, 32, 0.45)");
+      c.fillStyle = s; c.beginPath(); c.arc(x, y, R, 0, Math.PI * 2); c.fill();
+      c.fillStyle = "rgba(255, 255, 255, 0.5)"; c.beginPath(); c.ellipse(x - R * 0.4, y - R * 0.45, R * 0.32, R * 0.16, -0.6, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = "#0b0620"; c.lineWidth = 1.5; c.beginPath(); c.arc(x, y, R, 0, Math.PI * 2); c.stroke();
+      return dir > 0 ? x < F.W + R + 2 : x > -R - 2;
+    };
+  };
+  tick((t) => { F.g.clearRect(0, 0, F.W, F.H); balls.run(t); });
+  every(() => balls.add(beachBall()), 22, 38, 6);
+}
 
 // Fireworks over the water and, now and then, the two little biplanes dogfighting across the top, firing tracers until
 // one takes a hit and limps off smoking. Sharp, on the layer behind the page.

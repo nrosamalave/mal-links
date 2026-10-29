@@ -1,8 +1,9 @@
 // Spring: a fresh morning. Blue sky with fat drifting clouds and a soft sun, green hills dotted with flowers, a
 // cherry tree in full blossom, a farm windmill turning. Now and then a shower drifts over and leaves a rainbow behind the
-// name; butterflies and birds; petals blow down in front of the page and some settle on the cards. On the page:
-// sprigs of blossom on the corners of the cards and a few flowers on the name.
-import { $, art, dither, every, inked, layer, pick, rnd, scene, screen, seeded, shade, sky, steps, still, tick, trim } from "./kit.js";
+// name; butterflies and birds; a hot-air balloon drifting over; a bunny that hops out onto the meadow to nibble; petals
+// blow down in front of the page and some settle on the cards. On the page: sprigs of blossom on the corners of the
+// cards and a few flowers on the name, two bees buzzing between them, and now and then a ladybug crawling on a card.
+import { $, P, art, dither, every, inked, layer, pick, rnd, scene, screen, seeded, shade, sky, steps, still, tick, trim } from "./kit.js";
 
 const PETAL = [["pp.", "ppd"], [".p.", "pdp"], ["p..", ".pd"], ["pp", "dp"]];
 const PETALS = [["#ffc4dc", "#f08ab5"], ["#ffe3ef", "#f4a6c8"], ["#ffb0d0", "#e0709e"]].map(([p, d]) => PETAL.map((rows) => art(rows, { p, d })));
@@ -10,6 +11,34 @@ const BUTTERFLY = (c, d) => [["#.#", "#d#", ".d."], ["...", "#d#", "#d#"]].map((
 const BUTTERFLIES = [BUTTERFLY("#ffd84d", "#3a2a10"), BUTTERFLY("#7fd8ff", "#1a2a40"), BUTTERFLY("#ffffff", "#3a3a4a")];
 const BIRD = [["#...#", ".#.#.", "..#.."], [".....", "#####", "..#.."]].map((rows) => art(rows, { "#": "#2a3a5c" }));
 const BLOSSOM = ["#fff0f6", "#ffc4dc", "#f08ab5", "#c45a8a"];
+const BALLOON = layer(15, 23, (b) => {  // stripes round the envelope, lit from the upper left; ropes down to a wicker basket
+  const STRIPES = [["#ff9a9a", "#ff5a5a", "#c03a4a"], ["#fff0a0", "#ffd84d", "#d0a030"], ["#a0dcff", "#4aa8ff", "#2a70c0"], ["#ffc4e0", "#ff7eb6", "#c04a88"]];
+  for (let y = 0; y <= 16; y++) {
+    const hw = y <= 8 ? 7 * Math.sqrt(1 - ((8 - y) / 8.4) ** 2) : 7 * (1 - ((y - 8) / 9.5) ** 1.4);
+    for (let x = -7; x <= 7; x++) {
+      if (Math.abs(x) > hw + 0.3) continue;
+      const u = x / Math.max(1, hw), stripe = STRIPES[Math.max(0, Math.min(4, Math.floor((u + 1) * 2.5))) % 4];
+      b.fillStyle = stripe[u < -0.4 && y < 10 ? 0 : u > 0.5 || y > 13 ? 2 : 1];
+      b.fillRect(x + 7, y, 1, 1);
+    }
+  }
+  b.fillStyle = "#5a4a4a";
+  for (let y = 17; y < 20; y++) { b.fillRect(5, y, 1, 1); b.fillRect(9, y, 1, 1); }
+  b.fillStyle = "#8a5a2a"; b.fillRect(5, 20, 5, 3);
+  b.fillStyle = "#c08a4a"; b.fillRect(5, 20, 5, 1);
+});
+const BN = { w: "#efe6d8", W: "#ffffff", p: "#ffb0c0", e: "#efe6d8", k: "#2a1a1a", n: "#ff8aa0" };
+const BUNNY = {  // facing right
+  sit: art(["....pe..", "....pe..", "...wwww.", ".wwwwkwn", "wwwwwww.", "Wwwwww..", ".ww.ww.."], BN),
+  twitch: art(["...pe...", "....pe..", "...wwww.", ".wwwwkwn", "wwwwwww.", "Wwwwww..", ".ww.ww.."], BN),
+  hop: art([".....pe.", "....pe..", "..wwwww.", "wwwwwkwn", "Wwwwwww.", ".www....", "w....ww."], BN),
+};
+const BEE = [[".w.w.", "ykyky", ".yky."], ["..w..", "ykyky", ".yky."]].map((rows) => art(rows, { w: "#ffffffc0", y: "#ffd23f", k: "#2a1a10" }));
+const LB = { k: "#1a1014", r: "#e8303a", R: "#ff8a7a", g: "#dfe6f2" };
+const LADYBUG = {  // seen from above, crawling right, legs going
+  crawl: [["..k.k..", ".rrrr..", "rRrkrk.", "rkrrrkk", "rrrkrk.", ".rrrr..", ".k.k..."], [".k.k...", ".rrrr..", "rRrkrk.", "rkrrrkk", "rrrkrk.", ".rrrr..", "..k.k.."]].map((rows) => art(rows, LB)),
+  fly: art(["g.....g", ".gg.gg.", "..rrr..", ".rRrkkk", "..rrr..", ".gg.gg.", "g.....g"], LB),
+};
 
 let g, W = 0, H = 0, S = null;
 const behind = steps(), over = steps();
@@ -22,7 +51,8 @@ function build(spot) {
   const far = (x) => Math.round(ground - 8 - 4 * Math.sin(x * 0.035 + 2) - 2 * Math.sin(x * 0.09));
   const ridge = (x) => Math.round(ground - 2.5 * Math.sin(x * 0.04 + 0.3) - 1.5 * Math.sin(x * 0.11 + 1) - hump(x, tx, 22, 5) - hump(x, wx, 18, 4));
   const sun = { x: Math.round(Math.max(22, W * 0.16)), y: Math.round(Math.max(16, spot.name * 0.45)), R: Math.round(Math.min(12, W * 0.06)) };
-  S = { ground, ridge, cx, sun, rainbow: 0 };
+  const icons = $(".socials").getBoundingClientRect();
+  S = { ground, ridge, cx, sun, rainbow: 0, icons: [icons.left / P, icons.right / P] };
 
   S.back = layer(W, H, (b) => {
     sky(b, W, H, ["#1f3f7a", "#27508f", "#3062a3", "#3c75b5", "#5089c4", "#6aa0d2", "#8bb9e0", "#b3d3ec", "#d9eaf4"], ground);
@@ -201,10 +231,49 @@ function butterfly() {  // flutters along low over the meadow beside the page
   };
 }
 
+function balloon() {  // drifts slowly across high up, rising a little, its burner flaring now and then
+  const dir = Math.random() < 0.5 ? 1 : -1, speed = rnd(3.5, 5), y0 = rnd(S.ground * 0.12, S.ground * 0.3);
+  let t0 = null;
+  return (t) => {
+    t0 ??= t;
+    const e = (t - t0) / 1000, x = Math.round((dir > 0 ? -16 : W + 1) + dir * speed * e), y = Math.round(y0 - 0.25 * e + 2 * Math.sin(e / 2.3));
+    g.drawImage(BALLOON, x, y);
+    if (Math.sin(e * 0.9) > 0.8) { g.fillStyle = Math.floor(t / 90) % 2 ? "#ffd84d" : "#ff9a3a"; g.fillRect(x + 6, y + 17, 3, 2); }
+    return dir > 0 ? x < W + 1 : x > -16;
+  };
+}
+
+function bunny() {  // hops out from the side onto the meadow, sits to nibble with an ear twitching, turns and hops back
+  const [l, r] = S.icons, sides = [-1, 1].filter((s) => (s < 0 ? l : W - r) >= 30), from = sides.length ? pick(sides) : l > W - r ? -1 : 1;
+  const room = (from < 0 ? l : W - r) - 14;  // stays clear of the icons
+  const n = Math.max(2, Math.round(Math.min(room, rnd(18, 34)) / 7)), x0 = from < 0 ? -9 : W + 1, stay = rnd(3, 5), trip = n * 0.5;
+  let t0 = null;
+  return (t) => {
+    t0 ??= t;
+    const e = (t - t0) / 1000;
+    let k, face = -from, img = BUNNY.sit, up = 0;
+    if (e < trip) k = e;
+    else if (e < trip + stay) { k = trip; if (Math.sin(e * 6) > 0.8) img = BUNNY.twitch; }
+    else { k = 2 * trip + stay - e; face = from; if (k < 0) return false; }
+    const i = Math.floor(k / 0.5), q = Math.min(1, (k - i * 0.5) / 0.36);
+    if (e < trip || e > trip + stay) { up = 4 * Math.sin(Math.PI * q); if (q < 1) img = BUNNY.hop; }
+    const x = x0 - from * 7 * (i + q), feet = S.ridge(Math.round(x + 4)) + 10;
+    g.save();
+    g.translate(Math.round(x), Math.round(feet - 7 - up));
+    if (face < 0) { g.scale(-1, 1); g.translate(-8, 0); }
+    g.drawImage(img, 0, 0);
+    g.restore();
+    return true;
+  };
+}
+
 scene((ctx, w, h, spot) => { g = ctx; W = w; H = h; build(spot); return frame; });
 every(() => behind.add(birds()), 9, 16, 2);
 every(() => over.add(butterfly()), 5, 9, 1);
 every(() => behind.add(shower()), 38, 55, 2);
+every(() => behind.add(balloon()), 60, 90, 3);
+let hopping = false;
+every(() => { if (!hopping) { hopping = true; const b = bunny(); over.add((t) => b(t) || (hopping = false)); } }, 14, 24, 5);
 
 // Petals in front of the page, blowing down and across
 if (!still) {
@@ -224,10 +293,13 @@ if (!still) {
   });
 }
 
-// On the page: sprigs of blossom on card corners, flowers on the name, and petals that land on the cards and blow away
+// On the page: sprigs of blossom on card corners, flowers on the name, and petals that land on the cards and blow away;
+// two bees going from flower to flower, and now and then a ladybug
 {
-  let T = null, deco = null, landing = [];
+  let T = null, deco = null, landing = [], blooms = [], bug = null;
+  const bees = [0, 1].map((i) => ({ x: 0, y: 0, at: i, next: 0, phase: i * 2.4 }));
   function flower(d, x, y, r, color) {  // five round petals and a yellow middle
+    blooms.push({ x, y });
     for (let i = 0; i < 5; i++) {
       const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
       d.beginPath(); d.arc(x + Math.cos(a) * r * 0.62, y + Math.sin(a) * r * 0.62, r * 0.5, 0, Math.PI * 2);
@@ -256,9 +328,45 @@ if (!still) {
     const [b, lift] = pick(tops()), x = rnd(b.left + 4, b.right - 10), y = b.top + lift - 4;
     return { c: pick(PETALS), x, y: rest ? y : y - rnd(60, 130), floor: y, phase: rnd(0, 6), rest: rest ? 1e9 : rnd(5000, 11000), age: 0 };
   };
+  function buzz(c, b, t, dt) {  // circling a flower, and now and then landing on it a moment before going to another
+    const f = blooms[b.at % blooms.length];
+    if (t > b.next) { b.at = Math.floor(Math.random() * blooms.length); b.next = t + rnd(3000, 6000); b.land = Math.random() < 0.45 ? t + 1600 : 0; }
+    const sitting = b.land && t > b.land && t < b.land + 1300;
+    const tx = sitting ? f.x : f.x + 12 * Math.sin(t / 430 + b.phase) + 4 * Math.sin(t / 170 + b.phase * 2);
+    const ty = sitting ? f.y - 5 : f.y - 8 + 7 * Math.sin(t / 610 + b.phase);
+    const vx = (tx - b.x) * Math.min(1, dt * 3.5);
+    b.x += vx; b.y += (ty - b.y) * Math.min(1, dt * 3.5);
+    if (Math.abs(vx) > 0.05) b.face = Math.sign(vx);
+    c.save();
+    c.translate(Math.round(b.x), Math.round(b.y));
+    if (b.face < 0) c.scale(-1, 1);
+    c.drawImage(BEE[sitting ? Math.floor(t / 250) % 2 : Math.floor(t / 45) % 2], -7, -4, 15, 9);
+    c.restore();
+  }
+  function ladybug() {  // flies in, crawls a little way along the top of a card, opens up and flies off
+    const cards = [T.box(".ticket"), T.box(".rb"), ...[...document.querySelectorAll(".row")].map((a) => T.box(a))];
+    const on = cards.filter((b) => b.top + T.y > 60 && b.top + T.y < innerHeight - 40), b = pick(on.length ? on : cards);
+    const dir = Math.random() < 0.5 ? 1 : -1, walk = rnd(5, 8), x0 = dir > 0 ? rnd(b.left + 20, b.left + b.width * 0.4) : rnd(b.right - b.width * 0.4, b.right - 20), y0 = b.top + 9;
+    let t0 = null;
+    return (c, t) => {
+      t0 ??= t;
+      const e = (t - t0) / 1000;
+      let x, y, img = LADYBUG.fly, wob = 0;
+      if (e < 1.2) { const k = e / 1.2; x = x0 - dir * 50 * (1 - k); y = y0 - 70 * (1 - k) ** 1.5; wob = 4 * Math.sin(e * 14) * (1 - k); }
+      else if (e < 1.2 + walk) { const s = e - 1.2; x = x0 + dir * 9 * s; y = y0 + 1.5 * Math.sin(s * 1.3); img = LADYBUG.crawl[Math.floor(t / 120) % 2]; }
+      else { const k = (e - 1.2 - walk) / 1.5; if (k > 1) return false; x = x0 + dir * (9 * walk + 60 * k); y = y0 - 90 * k ** 1.3; wob = 4 * Math.sin(e * 14); }
+      c.save();
+      c.translate(Math.round(x), Math.round(y + wob));
+      if (dir < 0) c.scale(-1, 1);
+      c.drawImage(img, -7, -7, 14, 14);
+      c.restore();
+      return true;
+    };
+  }
   trim("a.row:last-of-type", {
     fit(layer) {
       T = layer;
+      blooms = [];
       T.g.imageSmoothingEnabled = false;
       const dpr = T.g.getTransform().a;
       deco = layer.deco ??= document.createElement("canvas");
@@ -278,9 +386,12 @@ if (!still) {
         }
       }
       if (still) landing = [land(true), land(true), land(true)];
+      for (const b of bees) if (!b.x && blooms.length) { const f = blooms[b.at % blooms.length]; b.x = f.x; b.y = f.y - 5; }
     },
     frame({ g: c }, t, dt) {
       if (deco) c.drawImage(deco, 0, 0, T.W, T.H);
+      if (blooms.length) for (const b of bees) buzz(c, b, t, dt);
+      if (bug && !bug(c, t)) bug = null;
       for (const l of landing) {
         l.age += dt * 1000;
         if (l.y < l.floor) {
@@ -302,4 +413,5 @@ if (!still) {
     },
   });
   every(() => { if (T && landing.length < 6) landing.push(land(false)); }, 2, 4.5, 1.2);
+  every(() => { if (T && !bug) bug = ladybug(); }, 14, 24, 4);
 }

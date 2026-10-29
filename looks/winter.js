@@ -1,12 +1,20 @@
 // Winter: a snowy night under the northern lights. Green and violet curtains ripple behind the name, stars twinkle, a
 // thin moon; snow-capped mountains, a pine forest, a log cabin with lit windows and smoke from its chimney, a snowman.
-// Snow falls behind the page and in front of it, and now and then a shooting star. On the page: snow piled on the name
-// and on top of the cards and icons, glinting, and icicles under the buttons that now and then let a drop of meltwater go.
-import { $, across, dither, every, gloss, inked, layer, rnd, scene, screen, seeded, shade, sky, steps, still, tick, trim } from "./kit.js";
+// Snow falls behind the page and in front of it, thin clouds drift past the moon, now and then a shooting star, and a fox
+// trots across the snow, stops to listen and dives nose-first into a drift. On the page: snow piled on the name and on
+// top of the cards and icons, glinting, the wind now and then lifting a plume of it off; icicles under the buttons that
+// now and then let a drop of meltwater go; a cardinal that drops in to hop about on the snow; snowballs thrown at the cards.
+import { $, P, across, art, dither, every, gloss, inked, layer, pick, rnd, scene, screen, seeded, shade, sky, steps, still, tick, trim } from "./kit.js";
 
 let g, W = 0, H = 0, S = null;
-const behind = steps();
+const behind = steps(), over = steps();
 const SNOW = "#eef6ff", SHADE = "#9fbbe0";
+const FX = { o: "#e8742a", O: "#ffa04a", k: "#3a1a10", t: "#d0601e", T: "#f08a3a", W: "#f4f0ea", n: "#1a0a08", d: "#3a1a10", c: "#f4f0ea", e: "#1a0a08" };
+const FOX = [[".........k.k", "TT.......oko", "tTT....oOooe", "Wtttoooooocn", "..ooooooc...", ".d.d...d.d.."],  // trotting, facing right
+  [".........k.k", ".TT......oko", "TtTT...oOooe", "Wtttoooooocn", "..ooooooc...", "..dd...dd..."]].map((rows) => art(rows, FX));
+const CD = { r: "#e8283a", D: "#a01828", k: "#1a0a10", o: "#ff9a3a", d: "#3a1a14" };
+const CARDINAL = { sit: art(["....r...", "...rrr..", "..rrkko.", ".rrrrk..", "rrDDrr..", ".rDDr...", "..d.d..."], CD),
+  fly: [art(["..DD....", "..rDr...", ".rrrrkko", "rrrrrk..", "..rr...."], CD), art(["........", "........", ".rrrrkko", "rrDDrk..", "..DD...."], CD)] };
 
 function build(spot) {
   const r = seeded(1221);
@@ -14,7 +22,22 @@ function build(spot) {
   const hump = (x, c, w, h) => h * Math.exp(-(((x - c) / w) ** 2));
   const kx = Math.round(Math.max(16, W * 0.1)), mx = Math.round(W - Math.max(14, W * 0.07));  // the cabin, the snowman
   const ridge = (x) => Math.round(ground - 2 * Math.sin(x * 0.045 + 0.6) - 1.5 * Math.sin(x * 0.12 + 2) - hump(x, kx, 22, 4));
-  S = { ground, ridge, windows: [], flakes: [], twinkle: [] };
+  const icons = $(".socials").getBoundingClientRect();
+  S = { ground, ridge, windows: [], flakes: [], twinkle: [], icons: [icons.left / P, icons.right / P], mx };
+
+  const cw = W + 300;
+  const wisps = (n, top, bottom) => layer(cw, Math.round(bottom + 8), (c) => {  // thin night clouds, lit along the top by the moon
+    const puffs = [];
+    for (let k = 0; k < n; k++) {
+      const x0 = r() * cw, y0 = top + r() * (bottom - top), len = 30 + r() * 60;
+      for (let i = 0; i < len; i += 3) puffs.push([x0 + i, y0 + Math.sin(i / 9) * 1.5, 3 + r() * 7 * Math.sin((i / len) * Math.PI + 0.15), 1 + r() * 1.3]);
+    }
+    for (const [fill, dy] of [["#4a6494", -1], ["#17233f", 0]]) {
+      c.fillStyle = fill;
+      for (const [x, y, rx, ry] of puffs) for (const shift of [0, -cw, cw]) { c.beginPath(); c.ellipse(x + shift, y + dy, Math.max(1, rx), ry, 0, 0, Math.PI * 2); c.fill(); }
+    }
+  });
+  S.clouds = [{ img: wisps(3, 4, ground * 0.3), speed: 1.6 }, { img: wisps(3, ground * 0.22, ground * 0.5), speed: 2.8 }];
 
   S.back = layer(W, H, (b) => {
     sky(b, W, H, ["#050a1e", "#071028", "#0a1734", "#0e1f42", "#132850", "#1a335e", "#22406c", "#2d4f7a"], ground);
@@ -165,6 +188,49 @@ function shootingStar() {
   };
 }
 
+function fox() {  // trots across in front of the trees leaving tracks, stops to listen, dives nose-first into a drift, trots on
+  const dir = Math.random() < 0.5 ? 1 : -1, speed = rnd(13, 18), prints = [], puff = [];
+  const [l, r] = S.icons, room = [[8, l - 10], [r + 10, S.mx - 12]].filter(([a, b]) => b > a);  // a spot the icons don't hide
+  const [a, b] = room.length ? pick(room) : [W * 0.2, W * 0.8], at = rnd(a, b);
+  const feet = (x) => S.ridge(Math.round(x)) + 8;
+  let x = dir > 0 ? -14 : W + 2, mode = "trot", clock = 0, last = null, step = x, gone = 0;
+  const burst = (px, py) => { for (let i = 0; i < 14; i++) puff.push({ x: px, y: py, vx: rnd(-22, 22), vy: -rnd(14, 34), age: 0 }); };
+  return (t) => {
+    const dt = Math.min(50, t - (last ?? t)) / 1000;
+    last = t; clock += dt;
+    if (mode !== "pounce") {
+      x += dir * speed * dt;
+      if (Math.abs(x - step) >= 3) { step = x; prints.push({ x: Math.round(x + 6), y: feet(x + 6) + (prints.length % 2), t }); }
+      if (mode === "trot" && (dir > 0 ? x + 6 >= at : x + 6 <= at)) { mode = "pounce"; clock = 0; }
+      if (mode === "on" && (dir > 0 ? x > W + 2 : x < -14)) gone ||= t;
+    }
+    for (const p of prints) {  // the tracks fade as snow fills them in
+      g.globalAlpha = Math.max(0, 1 - (t - p.t) / 14000) * 0.8;
+      g.fillStyle = "#14203e"; g.fillRect(p.x, p.y, 1, 1);
+    }
+    g.globalAlpha = 1;
+    let img = FOX[mode === "pounce" ? 0 : Math.floor(t / 150) % 2], dx = 0, up = 0, turn = 0, under = false;
+    if (mode === "pounce") {
+      const k = (clock - 0.9) / 0.6;
+      if (clock < 0.9) img = FOX[0];  // listening
+      else if (k < 1) { dx = dir * 14 * k; up = 12 * 4 * k * (1 - k); turn = -0.5 + 1.9 * k; }
+      else if (clock < 2.7) { dx = dir * 14; turn = 1.45 + 0.1 * Math.sin(t / 55); under = true; if (!puff.length) burst(x + 6 + dx + dir * 3, feet(x + 6 + dx)); }  // only the tail sticking out
+      else { x += dir * 14; step = x; mode = "on"; burst(x + 6, feet(x + 6)); }
+    }
+    const cx = x + 6 + dx, base = feet(x + 6 + dx);
+    g.save();
+    if (under) { g.beginPath(); g.rect(0, 0, W, base); g.clip(); }
+    g.translate(Math.round(cx), Math.round(base - 3 - up + (under ? 5 : 0)));
+    g.rotate(dir * turn);
+    if (dir < 0) g.scale(-1, 1);
+    g.drawImage(img, -6, -3);
+    g.restore();
+    g.fillStyle = SNOW;
+    for (const p of puff) { p.age += dt; p.vy += 70 * dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.age < 0.9) g.fillRect(Math.round(p.x), Math.round(p.y), 1, 1); }
+    return !gone || t - gone < 14000;
+  };
+}
+
 let puffs = [], smokeAt = 0, flakes = [];
 function frame(t, dt) {
   g.drawImage(S.back, 0, 0);
@@ -174,6 +240,13 @@ function frame(t, dt) {
     g.fillRect(s.x, s.y, 1, 1);
     if (k > 0.93) { g.fillStyle = "rgba(220, 235, 255, 0.5)"; g.fillRect(s.x - 1, s.y, 3, 1); g.fillRect(s.x, s.y - 1, 1, 3); }
   }
+  g.globalAlpha = 0.8;
+  for (const c of S.clouds) {
+    const cw = c.img.width, off = ((t * c.speed) / 1000) % cw;
+    g.drawImage(c.img, Math.round(off - cw), 0);
+    g.drawImage(c.img, Math.round(off), 0);
+  }
+  g.globalAlpha = 1;
   aurora(t);
   behind.run(t);
   g.drawImage(S.mountains, 0, 0);
@@ -194,6 +267,7 @@ function frame(t, dt) {
     g.fillStyle = k > 0.9 ? "#ffd27a" : "#ffb64a"; g.fillRect(w.x, w.y, w.w, w.h);
     g.fillStyle = "#33190f"; g.fillRect(w.x + (w.w >> 1), w.y, 1, w.h);
   }
+  over.run(t);
   if (!flakes.length) flakes = Array.from({ length: Math.round((W * H) / 260) }, () => ({ x: rnd(0, W), y: rnd(0, H), v: rnd(6, 16), phase: rnd(0, 6) }));
   for (const f of flakes) {  // snow behind the page, tiny and far off
     f.y += f.v * dt;
@@ -206,6 +280,7 @@ function frame(t, dt) {
 
 scene((ctx, w, h, spot) => { g = ctx; W = w; H = h; flakes = []; build(spot); return frame; });
 every(() => behind.add(shootingStar()), 12, 22, 4);
+every(() => { if (!over.size) over.add(fox()); }, 20, 34, 3);
 
 // Big soft flakes in front of the page, drifting
 if (!still) {
@@ -230,7 +305,8 @@ if (!still) {
 // On the page: snow on the name and on top of everything, icicles under the buttons and the RotoBot card
 {
   const ICE = { base: "#bfe3ff", light: "#ffffff", dark: "#5c97d0" };
-  let T = null, deco = null, glints = [], icicles = [], drops = [];
+  let T = null, deco = null, glints = [], icicles = [], drops = [], ledges = [], bird = null;
+  const fx = steps();
   function cap(d, x0, x1, y, depth) {  // a soft lumpy pile of snow along an edge, drooping a little over the ends
     const n = Math.max(2, Math.round((x1 - x0) / 9)), bumps = Array.from({ length: n + 1 }, () => rnd(0.6, 1));
     const height = (x) => {
@@ -249,6 +325,92 @@ if (!still) {
     s.addColorStop(0, "#ffffff"); s.addColorStop(0.55, SNOW); s.addColorStop(1, SHADE);
     shade(d, true); d.fillStyle = s; d.fill(); shade(d, false);
     for (let i = 0, k = Math.round((x1 - x0) / 14); i < k; i++) glints.push({ x: rnd(x0 + 2, x1 - 2), y: y - rnd(0, depth * 0.6), phase: rnd(0, 6), speed: rnd(0.4, 1.1) });
+    ledges.push({ x0, x1, y: y - depth * 0.6, at: (x) => y - height(Math.min(x1, Math.max(x0, x))) + 1 });  // the snow's surface, for the cardinal and the wind
+  }
+  const seen = (list, y) => { const on = list.filter((p) => y(p) + T.y > 60 && y(p) + T.y < innerHeight - 40); return on.length ? on : list; };
+  function cardinal() {  // flies in, lands on the snow on a card, hops along and turns round, then flies back off
+    const p = pick(seen(ledges.filter((l) => l.x1 - l.x0 > 150), (l) => l.y)), from = Math.random() < 0.5 ? -1 : 1, stay = rnd(4, 6.5);
+    const lx = rnd(p.x0 + 24, p.x1 - 40), land = { x: lx, y: p.at(lx + 8) }, sky = { x: from < 0 ? -20 : T.W + 4, y: land.y - rnd(60, 110) };
+    const hop = (e, at) => Math.min(1, Math.max(0, (e - at) / 0.25));
+    let t0 = null;
+    return (c, t) => {
+      t0 ??= t;
+      const e = (t - t0) / 1000, h1 = 1.4 + stay * 0.3, h2 = 1.4 + stay * 0.65;
+      let x, y, img, face = -from;
+      if (e < 1.4) {
+        const k = e / 1.4;
+        x = sky.x + (land.x - sky.x) * (1 - (1 - k) ** 2); y = sky.y + (land.y - sky.y) * k ** 0.6;
+        img = k > 0.92 ? CARDINAL.sit : CARDINAL.fly[Math.floor(t / 80) % 2];
+      } else if (e < 1.4 + stay) {
+        const q1 = hop(e, h1), q2 = hop(e, h2);
+        x = land.x - from * 9 * q1 + from * 9 * q2; y = p.at(x + 8) - 5 * Math.sin(Math.PI * q1) - 5 * Math.sin(Math.PI * q2);
+        img = CARDINAL.sit;
+        if (e > h2) face = from;
+      } else {
+        const k = (e - 1.4 - stay) / 1.4;
+        if (k > 1) return false;
+        x = land.x + from * k * 170; y = land.y - k * 130; face = from;
+        img = CARDINAL.fly[Math.floor(t / 80) % 2];
+      }
+      c.save();
+      c.translate(Math.round(x), Math.round(y) - img.height * 2);
+      if (face < 0) { c.scale(-1, 1); c.translate(-16, 0); }
+      c.drawImage(img, 0, 0, 16, img.height * 2);
+      c.restore();
+      return true;
+    };
+  }
+  function snowball() {  // thrown in from off the screen; it bursts on a card, and the splat slides down a little and melts away
+    const r = (q) => T.box(q), rb = r(".rb"), ticket = r(".ticket");
+    const marks = [...[...document.querySelectorAll(".row")].map((a) => { const b = r(a); return { x: rnd(b.right - 44, b.right - 18), y: rnd(b.top + 14, b.bottom - 14) }; }),
+      { x: rnd(rb.right - 76, rb.right - 26), y: rb.top + rnd(20, 42) }, { x: rnd(ticket.right - 64, ticket.right - 26), y: ticket.top + rnd(18, 42) }];
+    const hit = pick(seen(marks, (m) => m.y)), from = Math.random() < 0.5 ? -1 : 1, x0 = from < 0 ? -8 : T.W + 8, y0 = hit.y - rnd(30, 70), high = rnd(20, 40);
+    const blobs = Array.from({ length: 9 }, (_, i) => ({ dx: rnd(-7, 7) - from * i * 0.6, dy: rnd(-5, 5), r: rnd(2, 5) })), bits = [];
+    const drips = Array.from({ length: 3 }, () => ({ dx: rnd(-6, 6), len: rnd(4, 10) }));
+    let t0 = null;
+    return (c, t, dt) => {
+      t0 ??= t;
+      const e = (t - t0) / 1000;
+      if (e < 0.5) {
+        const k = e / 0.5, x = x0 + (hit.x - x0) * k, y = y0 + (hit.y - y0) * k - 4 * high * k * (1 - k);
+        const s = c.createRadialGradient(x - 1.5, y - 1.5, 0.5, x, y, 5);
+        s.addColorStop(0, "#ffffff"); s.addColorStop(1, SHADE);
+        shade(c, true); c.fillStyle = s; c.beginPath(); c.arc(x, y, 4.5, 0, Math.PI * 2); c.fill(); shade(c, false);
+        return true;
+      }
+      if (!bits.length) for (let i = 0; i < 12; i++) bits.push({ x: hit.x, y: hit.y, vx: -from * rnd(10, 70) + rnd(-30, 30), vy: -rnd(20, 70), age: 0 });
+      const s = e - 0.5, slide = 5 * Math.min(1, s / 4);
+      if (s > 6) return false;
+      c.globalAlpha = Math.min(1, (6 - s) / 1.5);
+      c.fillStyle = SNOW;
+      for (const d of drips) { c.beginPath(); c.roundRect(hit.x + d.dx - 1.2, hit.y, 2.4, 3 + d.len * Math.min(1, s / 3), 1.2); c.fill(); }
+      shade(c, true);
+      for (const b of blobs) { c.beginPath(); c.arc(hit.x + b.dx, hit.y + b.dy + slide * (0.6 + b.r / 10), b.r, 0, Math.PI * 2); c.fill(); }
+      shade(c, false);
+      c.globalAlpha = 1;
+      for (const b of bits) {
+        b.age += dt; b.vy += 220 * dt; b.x += b.vx * dt; b.y += b.vy * dt;
+        if (b.age < 0.7) { c.globalAlpha = 1 - b.age / 0.7; c.beginPath(); c.arc(b.x, b.y, 1.3, 0, Math.PI * 2); c.fill(); }
+      }
+      c.globalAlpha = 1;
+      return true;
+    };
+  }
+  function gust() {  // the wind lifts a plume of powder off the snow on top of a card
+    const p = pick(seen(ledges, (l) => l.y)), dir = Math.random() < 0.5 ? 1 : -1, span = (p.x1 - p.x0) * 0.45, x0 = rnd(p.x0, p.x1 - span);
+    const bits = Array.from({ length: 26 }, () => { const x = x0 + rnd(0, span); return { x, y: p.at(x) + rnd(0, 2), vx: dir * rnd(30, 95), vy: -rnd(6, 28), life: rnd(0.8, 1.7), age: -rnd(0, 0.6), r: rnd(0.6, 1.5) }; });
+    return (c, t, dt) => {
+      c.fillStyle = "#ffffff";
+      for (const b of bits) {
+        b.age += dt;
+        if (b.age < 0 || b.age > b.life) continue;
+        b.vx *= 1 - 0.6 * dt; b.vy += 20 * dt; b.x += b.vx * dt; b.y += b.vy * dt;
+        c.globalAlpha = 0.9 * (1 - b.age / b.life);
+        c.beginPath(); c.arc(b.x, b.y, b.r, 0, Math.PI * 2); c.fill();
+      }
+      c.globalAlpha = 1;
+      return bits.some((b) => b.age < b.life);
+    };
   }
   function hang(d, x0, x1, y, n, len, floor) {  // a frosted lip and icicles hanging off it
     d.fillStyle = SNOW;
@@ -291,7 +453,8 @@ if (!still) {
   }
   trim("a.row:last-of-type", {
     fit(layer) {
-      T = layer; glints = []; icicles = [];
+      T = layer; glints = []; icicles = []; ledges = [];
+      T.g.imageSmoothingEnabled = false;
       const dpr = T.g.getTransform().a;
       deco = layer.deco ??= document.createElement("canvas");
       deco.width = Math.round(T.W * dpr); deco.height = Math.round(T.H * dpr);
@@ -309,10 +472,16 @@ if (!still) {
       hang(d, go.left + 2, go.right - 2, go.bottom - 2, 8, [8, 22], rb.top);
       hang(d, btn.left + 2, btn.right - 2, btn.bottom - 3, 7, [6, 15], rb.bottom - 8);
       hang(d, rb.left + 3, rb.right - 3, rb.bottom - 2, 9, [8, 22], b(".label:nth-of-type(2)").top - 2);
+      if (still) {  // the cardinal sits on the ticket's snow
+        const perch = ledges.find((l) => l.x0 === ticket.left - 2), x = Math.round(ticket.right - 90);
+        bird = (c) => (c.drawImage(CARDINAL.sit, x, Math.round(perch.at(x + 8)) - 14, 16, 14), true);
+      }
     },
     frame({ g: c }, t, dt) {
       if (!deco) return;
       c.drawImage(deco, 0, 0, T.W, T.H);
+      fx.run(c, t, dt);
+      if (bird && !bird(c, t)) bird = null;
       for (const s of glints) {  // the snow glinting
         const k = Math.sin(t / 1000 * s.speed + s.phase);
         if (k < 0.82) continue;
@@ -339,4 +508,7 @@ if (!still) {
     const i = icicles[Math.floor(Math.random() * icicles.length)];
     drops.push({ x: i.x, y: i.y - 1, floor: i.floor, vy: 0, age: 0 });
   }, 1.8, 3.6, 2);
+  every(() => { if (T && !bird) bird = cardinal(); }, 15, 26, 5);
+  every(() => { if (T) fx.add(snowball()); }, 9, 16, 2.5);
+  every(() => { if (T && ledges.length) fx.add(gust()); }, 5, 9, 1.5);
 }
